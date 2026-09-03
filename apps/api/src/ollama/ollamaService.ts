@@ -74,6 +74,7 @@ export class LocalOllamaService implements OllamaService {
         model: this.model,
         messages,
         stream: false,
+        think: false,
         options: {
           temperature: 0.2,
         },

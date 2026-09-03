@@ -111,6 +111,7 @@ function App() {
         body: JSON.stringify({
           message: content,
           history: messages.slice(-8),
+          think: false,
         }),
       });
       const body = await response.json();
