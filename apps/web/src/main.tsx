@@ -9,7 +9,6 @@ import {
   Server,
 } from "lucide-react";
 import {
-  chatResponseSchema,
   productSearchResponseSchema,
   type ChatMessage,
   type Product,
@@ -111,21 +110,54 @@ function App() {
         body: JSON.stringify({
           message: content,
           history: messages.slice(-8),
+          think: false,
         }),
       });
-      const body = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
+        const body = await response.json();
         throw new Error(body.error ?? "Assistant request failed.");
-      const parsed = chatResponseSchema.parse(body);
-      setMessages([
-        ...nextMessages,
-        { role: "assistant", content: parsed.answer },
-      ]);
+      }
+
+      if (!response.body) throw new Error("Assistant response was empty.");
+      const assistantIndex = nextMessages.length;
+      setMessages([...nextMessages, { role: "assistant", content: "" }]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      setChatLoading(false);
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+          if (!dataLine) continue;
+          const data = JSON.parse(dataLine.slice(6)) as {
+            content?: string;
+            error?: string;
+          };
+          if (data.error) throw new Error(data.error);
+          if (data.content) {
+            setMessages((current) =>
+              current.map((message, index) =>
+                index === assistantIndex
+                  ? { ...message, content: message.content + data.content }
+                  : message,
+              ),
+            );
+          }
+        }
+
+        if (done) break;
+      }
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Assistant request failed.",
       );
-      setMessages(messages);
+      setMessages(nextMessages);
     } finally {
       setChatLoading(false);
     }
