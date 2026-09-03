@@ -1,0 +1,26 @@
+{
+  "name": "ai-commerce-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portfolio MVP for a local Ollama-powered B2B commerce assistant.",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @ai-commerce/shared && concurrently -n api,web \"npm run dev -w @ai-commerce/api\" \"npm run dev -w @ai-commerce/web\"",
+    "build": "npm run build -w @ai-commerce/shared && npm run build -w @ai-commerce/api && npm run build -w @ai-commerce/web",
+    "test": "npm run build -w @ai-commerce/shared && npm run test -w @ai-commerce/api && npm run test -w @ai-commerce/web && npm run test -w @ai-commerce/shared",
+    "lint": "npm run lint -w @ai-commerce/shared && npm run lint -w @ai-commerce/api && npm run lint -w @ai-commerce/web",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "concurrently": "^9.1.2",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.19.1",
+    "vitest": "^2.1.8"
+  }
+}
