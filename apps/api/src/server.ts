@@ -92,7 +92,37 @@ export async function buildServer(deps?: {
       return;
     }
 
-    return chatService.answer(parsed.data.message, parsed.data.history);
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      ...(request.headers.origin
+        ? {
+            "Access-Control-Allow-Origin": request.headers.origin,
+            Vary: "Origin",
+          }
+        : {}),
+    });
+
+    const sendEvent = (event: string, data: unknown) => {
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      const result = await chatService.answerStream(
+        parsed.data.message,
+        parsed.data.history,
+        (chunk) => sendEvent("chunk", { content: chunk }),
+      );
+      sendEvent("done", result);
+    } catch (error) {
+      sendEvent("error", {
+        error: error instanceof Error ? error.message : "Assistant request failed.",
+      });
+    } finally {
+      reply.raw.end();
+    }
   });
 
   app.post("/api/product-search", async (request, reply) => {

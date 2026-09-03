@@ -21,6 +21,10 @@ export interface OllamaService {
   chat(
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   ): Promise<string>;
+  chatStream?(
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    onChunk: (chunk: string) => void,
+  ): Promise<string>;
   generateJson<T>(
     prompt: string,
     schema: z.ZodType<T>,
@@ -83,6 +87,45 @@ export class LocalOllamaService implements OllamaService {
       return response.message.content;
     } catch (error) {
       this.logOllamaCall("chat", this.model, startedAt, false, error);
+      throw new AppError(
+        normalizeOllamaError(
+          error,
+          `Unable to generate with model "${this.model}".`,
+        ),
+        503,
+        "OLLAMA_GENERATION_FAILED",
+      );
+    }
+  }
+
+  async chatStream(
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    onChunk: (chunk: string) => void,
+  ) {
+    const startedAt = performance.now();
+    let responseText = "";
+    try {
+      const response = await this.client.chat({
+        model: this.model,
+        messages,
+        stream: true,
+        think: false,
+        options: {
+          temperature: 0.2,
+        },
+      });
+
+      for await (const part of response) {
+        const chunk = part.message.content;
+        if (!chunk) continue;
+        responseText += chunk;
+        onChunk(chunk);
+      }
+
+      this.logOllamaCall("chat_stream", this.model, startedAt, true);
+      return responseText;
+    } catch (error) {
+      this.logOllamaCall("chat_stream", this.model, startedAt, false, error);
       throw new AppError(
         normalizeOllamaError(
           error,
